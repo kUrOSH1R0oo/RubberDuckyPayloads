@@ -5,7 +5,7 @@
 # responsibly and only in environments where you have explicit permission.
 
 # Define the IP address and port for the connection
-$ip = '192.168.87.246' # Replace this
+$ip = '192.168.191.64' # Replace this
 $port = 1234 # Replace this
 
 # Create a TCP client and connect to the specified IP and port
